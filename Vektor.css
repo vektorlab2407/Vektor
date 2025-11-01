@@ -1,7 +1,5 @@
-/* Modernized styles for editgambar UI */
-
 :root{
-  --bg-1: #0f1724; /* deep */
+  --bg-1: #0f1724;
   --bg-2: linear-gradient(135deg,#0f1724,#0b1220);
   --card: rgba(255,255,255,0.04);
   --glass: rgba(255,255,255,0.03);
@@ -28,7 +26,6 @@ body{
 
 .app{max-width:1380px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
 
-/* Header */
 .app-header{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .brand{display:flex;align-items:center;gap:14px}
 .logo{width:56px;height:56px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--primary),var(--accent));box-shadow:0 6px 18px rgba(123,97,255,0.18)}
@@ -37,7 +34,6 @@ body{
 .brand-text .tag{font-size:13px;color:var(--muted)}
 .top-actions{display:flex;gap:8px}
 
-/* Top navigation beside brand */
 .top-actions{display:flex;align-items:center;gap:10px}
 .nav-list{display:flex;gap:8px;list-style:none;margin:0;padding:0}
 .nav-link{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;text-decoration:none;color:var(--muted);background:transparent;border:1px solid rgba(255,255,255,0.03);font-weight:700;font-size:13px}
@@ -45,12 +41,10 @@ body{
 .nav-link:focus{outline:2px solid rgba(123,97,255,0.12);outline-offset:2px}
 .nav-link.active{background:linear-gradient(135deg,var(--primary),#4ea1ff);color:#fff}
 
-/* Buttons */
 .btn{background:linear-gradient(135deg,var(--primary),#4ea1ff);border:none;color:white;padding:8px 12px;border-radius:10px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
 .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
 .btn.small{padding:6px 10px;font-size:13px;border-radius:8px}
 
-/* Editor layout */
 .editor{display:grid;grid-template-columns:270px 1fr 280px;gap:20px}
 .sidebar{display:flex;flex-direction:column;gap:16px}
 .sidebar.right{align-items:stretch}
@@ -59,7 +53,6 @@ body{
 .card-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
 .card-header h2{font-size:15px;display:flex;align-items:center;gap:8px}
 
-/* Upload area */
 .upload-area{display:flex;align-items:center;gap:12px;cursor:pointer;padding:18px;border-radius:10px;border:1px dashed rgba(255,255,255,0.05);background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);transition:transform .16s ease,box-shadow .16s ease}
 .upload-area:focus{outline:none;box-shadow:0 6px 20px rgba(123,97,255,0.12);transform:translateY(-3px)}
 .upload-area .upload-icon{width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center}
@@ -68,7 +61,6 @@ body{
 .upload-area small{display:block;color:var(--muted);font-size:12px}
 #file-input{display:none}
 
-/* Controls compact */
 .compact .control-row{display:flex;gap:10px;align-items:center;margin-bottom:10px}
 .field{flex:1}
 .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
@@ -76,7 +68,6 @@ body{
 .checkbox-inline{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
 .compact input[type=range]{width:100%}
 
-/* Format select styling */
 #format-select{
   width:100%;
   padding:10px 40px 10px 12px;
@@ -90,18 +81,13 @@ body{
   background-repeat:no-repeat;
   background-position: right 12px center;
   background-size: 14px 14px;
-  /* SVG caret (light) */
   background-image: url("data:image/svg+xml;utf8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='14'%20height='14'%20viewBox='0%200%2024%2024'%3E%3Cpath%20d='M7%2010l5%205%205-5'%20fill='none'%20stroke='%23e6eef8'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 #format-select:focus{outline:none;box-shadow:0 8px 26px rgba(123,97,255,0.12);border-color:var(--primary)}
 
-/* Make the select visually consistent on small controls rows */
 .compact .field select, .compact select{display:block;width:100%}
 
-/* Native <option> styling — note: many browsers / OS ignore heavy styling for <option>.
-   This will work in some browsers (e.g. Firefox) but may be ignored in Chromium-based browsers
-   which use the system-native popup. For fully-custom appearance, consider a JS-based custom dropdown. */
 #format-select option{
   background-color:#000 !important;
   color:#fff !important;
@@ -109,7 +95,6 @@ body{
 
 #format-select optgroup{ background-color:#111; color:#ddd }
 
-/* Canvas / preview */
 .canvas-area{display:flex;flex-direction:row;gap:12px;align-items:flex-start}
 .preview-wrap{flex:1;display:flex;flex-direction:column;gap:12px}
 .preview-container{position:relative;min-height:420px;display:flex;align-items:center;justify-content:center;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.03);background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02))}
@@ -120,8 +105,6 @@ body{
 
 .canvas-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 
-/* AI helper note under canvas actions (responsive) */
-/* AI instruction note: hidden by default, shown via toggle */
 .canvas-area .card-header .ai-note{
   width:100%;
   margin-top:0;
@@ -136,11 +119,8 @@ body{
 .canvas-area .card-header .ai-note.show{max-height:240px;opacity:1;margin-top:8px}
 .canvas-area .card-header .ai-note code{background:rgba(255,255,255,0.03);padding:4px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.02);font-family:monospace;font-size:11px;color:inherit}
 
-/* make sure action buttons stay together and shift to the right when possible */
 .canvas-area .card-header .canvas-actions{margin-left:auto}
 
-/* Right-side thumbnails next to preview */
-/* Side thumbnails: show as a 2-column grid that wraps to new rows as needed */
 .side-thumbs{width:100%;display:grid;grid-template-columns:repeat(2,1fr);gap:10px;align-content:start}
 .side-thumbs .thumb {
     width: 100%;
@@ -152,7 +132,6 @@ body{
 }
 .side-thumbs img{width:100%;height:100%;object-fit:cover;display:block}
 
-/* Thumbnail metadata shown under each thumbnail image */
 .side-thumbs .thumb-meta{
   padding:8px 10px;
   background:transparent;
@@ -168,7 +147,6 @@ body{
 .side-thumbs .thumb-meta .meta-dim, .side-thumbs .thumb-meta .meta-new, .side-thumbs .thumb-meta .meta-size, .side-thumbs .thumb-meta .meta-format{color:var(--muted);font-weight:600}
 .side-thumbs .thumb {display:flex;flex-direction:column}
 
-/* highlight thumbnail currently loaded in preview */
 .side-thumbs .selected-thumb{outline:2px solid rgba(123,97,255,0.18);box-shadow:0 8px 20px rgba(123,97,255,0.06);}
 
 .side-thumbs .side-thumbs-controls{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px}
@@ -177,28 +155,23 @@ body{
 .side-thumbs .thumb-info{flex:1;text-align:center;color:var(--muted);font-weight:700}
 .side-thumbs .thumb-empty{grid-column:1/-1;color:var(--muted);padding:10px;text-align:center}
 
-/* Placeholder target styling for left placement (hidden until used) */
 .side-thumbs-target{width:132px;min-height:60px;display:flex;flex-direction:column;gap:10px}
 .side-thumbs-target[aria-hidden="true"]{display:none}
 
-/* small style for header toggle button to match nav links */
 #thumbs-pos-toggle{cursor:pointer;border-radius:8px;padding:8px 10px;background:transparent;border:1px solid rgba(255,255,255,0.03);color:var(--muted);font-weight:700}
 #thumbs-pos-toggle[aria-pressed="true"]{background:linear-gradient(135deg,var(--primary),#4ea1ff);color:#fff}
 
-/* small visual for the info toggle when active */
 #ai-info-toggle[aria-expanded="true"], #ai-info-toggle.active{box-shadow:0 8px 22px rgba(123,97,255,0.12);border-color:rgba(123,97,255,0.18);background:linear-gradient(135deg,var(--primary),#4ea1ff);color:#fff}
 
 .info-bar{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:13px}
 .info{background:var(--glass);padding:8px 10px;border-radius:8px}
 
-/* Presets & adjustments */
 .presets{display:flex;flex-wrap:wrap;gap:8px}
 .preset{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px 10px;border-radius:8px;color:var(--muted);cursor:pointer;font-weight:600}
 .preset.active{background:linear-gradient(135deg,var(--primary),#4ea1ff);color:white;box-shadow:0 8px 24px rgba(123,97,255,0.14)}
 .adjustments{margin-top:12px;display:flex;flex-direction:column;gap:8px}
 .adjustments input[type=range]{width:100%}
 
-/* Filter presets (grid of icon buttons) */
 .filter-presets{
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(80px,1fr));
@@ -225,11 +198,9 @@ body{
 .filter-presets .preset span{font-size:13px;color:var(--muted);display:block}
 .filter-presets .preset.active{background:linear-gradient(135deg,var(--primary),#4ea1ff);color:white;box-shadow:0 10px 30px rgba(123,97,255,0.14);transform:translateY(-4px)}
 
-/* hover & focus for better discoverability */
 .filter-presets .preset:hover{box-shadow:0 6px 20px rgba(2,6,23,0.45);transform:translateY(-2px)}
 .filter-presets .preset:focus{outline:2px solid rgba(123,97,255,0.18);outline-offset:2px}
 
-/* Quick presets: horizontal, compact, used for quick filter picks */
 .quick-presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:10px;margin-bottom:10px}
 .quick-presets .preset{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px 8px;height:72px;text-align:center;background:transparent;border:1px solid rgba(255,255,255,0.04);border-radius:10px;transition:transform .14s ease, box-shadow .16s ease, background .12s ease;cursor:pointer}
 .quick-presets .preset i{font-size:16px;color:var(--muted)}
@@ -238,13 +209,12 @@ body{
 .quick-presets .preset:hover{box-shadow:0 6px 20px rgba(2,6,23,0.45);transform:translateY(-2px)}
 .quick-presets .preset:focus{outline:2px solid rgba(123,97,255,0.18);outline-offset:2px}
 
-/* Background sizes selector */
 .sizes-card .background-sizes{
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
   gap:8px;
 }
-/* Collapsible behavior: hide by default and animate open */
+
 .sizes-card{
   overflow:visible;
 }
@@ -255,12 +225,12 @@ body{
   transition: max-height .32s ease, opacity .22s ease;
 }
 .sizes-card.open .background-sizes{
-  max-height:720px; /* large enough for content */
+  max-height:720px;
   opacity:1;
 }
 .sizes-card .card-header h2[role="button"]{cursor:pointer}
 .sizes-card .card-header h2[role="button"]::after{
-  content: '\25BC'; /* down caret */
+  content: '\25BC';
   display:inline-block;
   margin-left:8px;
   font-size:12px;
@@ -270,7 +240,6 @@ body{
 }
 .sizes-card.open .card-header h2[role="button"]::after{transform:rotate(180deg)}
 
-/* Collapsible helpers for other panels */
 .card.compact.collapsed .control-row,
 .card.compact.collapsed .checkbox-inline,
 .card.compact.collapsed .field > * {
@@ -279,7 +248,7 @@ body{
 .collapsible-toggle{cursor:pointer}
 .quick-presets,
 .filter-presets{
-  max-height:1000px; /* default open */
+  max-height:1000px; 
   opacity:1;
   transition: max-height .32s ease, opacity .22s ease;
 }
@@ -316,9 +285,7 @@ body{
 .bg-size.active,.bg-size[aria-pressed="true"]{background:linear-gradient(135deg,var(--primary),#4ea1ff);color:#fff;box-shadow:0 10px 30px rgba(123,97,255,0.14);transform:translateY(-3px)}
 .bg-size:focus{outline:2px solid rgba(123,97,255,0.12);outline-offset:2px}
 
-/* Recent list */
 .recent-list{
-  /* default: horizontal row (used for smaller/narrow viewports and inspector modes) */
   display:flex;
   flex-direction:row;
   gap:8px;
@@ -330,29 +297,24 @@ body{
 .recent-list .thumb{width:72px;height:90px;border-radius:8px;overflow:hidden;flex:0 0 auto;border:1px solid rgba(255,255,255,0.03)}
 .recent-list img{width:100%;height:100%;object-fit:cover;display:block}
 
-/* Desktop / full-browser: stack vertically */
 @media (min-width: 1100px) {
   .recent-list{flex-direction:column;align-items:flex-start;max-height:420px}
   .recent-list .thumb{width:72px;height:85px}
 }
 
-/* Medium widths (inspector/resized desktop): keep horizontal row */
 @media (max-width: 1099px) and (min-width: 521px) {
   .recent-list{flex-direction:row;max-height:none}
   .recent-list .thumb{width:72px;height:80px}
 }
 
-/* Small / mobile: horizontal row with smaller thumbs if needed */
 @media (max-width: 520px) {
   .recent-list{flex-direction:row;gap:6px}
   .recent-list .thumb{width:64px;height:70px}
 }
 
-/* Notification */
 .notification{position:fixed;right:20px;top:20px;padding:12px 14px;border-radius:10px;background:var(--success);color:#042815;display:flex;align-items:center;gap:8px;transform:translateX(120%);transition:transform .28s ease}
 .notification.show{transform:translateX(0)}
 
-/* Responsive */
 @media (max-width:1100px){
   .editor{grid-template-columns:1fr;}
   .sidebar.right{order:3}
@@ -364,11 +326,9 @@ body{
   .preview-container{min-height:300px}
 }
 
-/* small helpers */
 .small{font-size:13px}
 .muted{color:var(--muted)}
 
-/* Modal for apply-to options (bulk/selection) */
 .apply-modal-backdrop{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(2,6,23,0.85);display:flex;align-items:center;justify-content:center;z-index:1200;visibility:hidden;opacity:0;transition:opacity .16s ease,visibility .16s}
 .apply-modal-backdrop.show{visibility:visible;opacity:1}
 .apply-modal{width:760px;max-width:94%;background:linear-gradient(180deg,#071226,#0b1424);border-radius:14px;padding:18px;box-shadow:0 30px 80px rgba(2,6,23,0.75);border:1px solid rgba(255,255,255,0.04);color:inherit}
@@ -384,7 +344,6 @@ body{
 .apply-modal .size-info .label{font-size:13px;color:var(--muted)}
 .apply-modal .size-info .size-value{font-size:20px;color:#ffffff;margin-top:6px}
 
-/* Inline size display (single line): 'Ukuran yang dipilih : 0x0' — not bold */
 .apply-modal .size-info .size-inline{font-size:14px;color:var(--muted)}
 .apply-modal .size-info .size-inline span{color:#ffffff;font-weight:600;margin-left:6px}
 
@@ -411,24 +370,69 @@ body{
     width: 200%;
 }
 
-/* Action buttons inside the modal */
 .apply-modal .btn{border-radius:10px;padding:8px 12px}
 .apply-modal .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
 .apply-modal .btn[disabled]{opacity:0.5;cursor:not-allowed}
 
-/* Specific modal action variants */
 .apply-modal #apply-to-preview{background:linear-gradient(135deg,var(--primary),#4ea1ff);color:#fff}
 .apply-modal #apply-to-all{background:linear-gradient(135deg,#2abbf0,#4ea1ff);color:#fff}
 .apply-modal #apply-to-selected{background:linear-gradient(135deg,#6ee7b7,#7b61ff);color:#071226}
 
-/* Ensure generic 'ghost' and 'apply-btn' classes are available for dynamically-created modals (download, zip) */
 .ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);padding:8px 12px;border-radius:10px;cursor:pointer}
 .apply-btn{background:linear-gradient(135deg,var(--primary),#4ea1ff);color:#fff;padding:8px 12px;border-radius:10px;border:none;cursor:pointer;font-weight:700}
 
-/* Responsive tweaks */
 @media (max-width:720px){
   .apply-modal{width:92%;padding:14px}
   .apply-modal .modal-body{flex-direction:column}
   .apply-modal .modal-left{flex:auto}
   .apply-modal .modal-right{border-left:none}
+}
+
+.apply-nav{display:flex}
+.apply-nav{display:flex}
+
+@media (max-width:720px){
+  .apply-nav{display:none !important}
+}
+
+@media (max-width:720px) {
+  .btn{padding:10px 14px;font-size:15px;min-height:44px}
+  .btn.small{padding:8px 10px;min-height:40px}
+  .card-header{flex-direction:column;align-items:flex-start;gap:8px}
+  .card-header h2{font-size:15px}
+  .upload-area{width:100%;padding:14px}
+  .canvas-area .card-header .canvas-actions{margin-left:0;width:100%;display:flex;justify-content:flex-end;flex-wrap:wrap}
+  .preview-container img#image-preview{max-height:calc(60vh);width:auto}
+}
+
+@media (max-width:420px) {
+  .apply-modal-backdrop{align-items:stretch;padding:12px}
+  .apply-modal{width:100%;height:100%;max-width:100%;border-radius:0;padding:12px;display:flex;flex-direction:column}
+  .apply-modal .modal-body{flex:1;overflow:auto}
+  .apply-modal .modal-right{max-height:none;border-left:none;padding-left:0}
+}
+.apply-thumb-scroll{
+  display:flex;
+  gap:10px;
+  padding:8px 6px;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  align-items:flex-start;
+}
+.apply-thumb-scroll .scroll-item{
+  flex:0 0 auto;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  min-width:88px;
+  max-width:110px;
+}
+.apply-thumb-scroll .scroll-item img{width:84px;height:140px;object-fit:cover;border-radius:8px;border:1px solid rgba(255,255,255,0.04)}
+.apply-thumb-scroll .scroll-item input[type=checkbox]{width:18px;height:18px}
+.apply-thumb-scroll .scroll-item div{font-size:12px;color:var(--muted);text-align:center;max-width:86px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+@media (max-width:360px){
+  .apply-thumb-scroll .scroll-item img{width:74px;height:120px}
+  .apply-thumb-scroll .scroll-item{min-width:78px}
 }
