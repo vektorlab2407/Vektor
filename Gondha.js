@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const applyBtn = document.getElementById('apply-btn');
     const resetBtn = document.getElementById('reset-btn');
     const downloadBtn = document.getElementById('download-btn');
+    const downloadExportBtn = document.getElementById('download-export-btn');
     const originalDimensions = document.getElementById('original-dimensions');
     const newDimensions = document.getElementById('new-dimensions');
     const fileSize = document.getElementById('file-size');
@@ -548,6 +549,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function blobToDataURL(blob) {
+        return new Promise((resolve, reject) => {
+            if (!blob) return resolve(null);
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => resolve(null);
+            try { reader.readAsDataURL(blob); } catch (e) { resolve(null); }
+        });
+    }
+
     function downloadBlob(blob, filename) {
         if (!blob) return;
         const url = URL.createObjectURL(blob);
@@ -719,6 +730,227 @@ document.addEventListener('DOMContentLoaded', () => {
         backdrop.classList.add('show');
     }
 
+    // --- Export preview generation ---
+    function paperSizeToMM(size) {
+        const map = { a4: {w:210,h:297}, a3:{w:297,h:420}, a5:{w:148,h:210}, letter:{w:216,h:279}, legal:{w:216,h:356} };
+        return map[size] || { w:210, h:297 };
+    }
+
+    async function buildExportHTML(formatOverride) {
+        try {
+            const fmt = formatOverride || (formatSelect && formatSelect.value) || 'application/pdf';
+            const paper = (document.getElementById('paper-size') || {}).value || 'a4';
+            const orientation = (document.querySelector('input[name="orientation"]:checked') || {}).value || 'portrait';
+            const dpi = parseInt((document.getElementById('dpi') || {}).value, 10) || 300;
+            const margin = parseInt((document.getElementById('margin') || {}).value, 10) || 10;
+
+            const dims = paperSizeToMM(paper);
+            let wmm = dims.w, hmm = dims.h;
+            if (orientation === 'landscape') { const t = wmm; wmm = hmm; hmm = t; }
+
+            // build list of images to include: main preview first, then any side thumbnails
+            const images = [];
+            try {
+                const main = (imagePreview && imagePreview.src) ? imagePreview.src : (initialState && initialState.src) ? initialState.src : null;
+                if (main) images.push({ src: main, label: 'Pratinjau' });
+            } catch (e) {}
+            try {
+                if (Array.isArray(sideThumbsData) && sideThumbsData.length) {
+                    sideThumbsData.forEach((it, i) => {
+                        try { if (it && it.src) images.push({ src: it.src, label: it.name || `Gambar ${i+1}` }); } catch (e) {}
+                    });
+                }
+            } catch (e) {}
+
+            // Fallback: if no images, show a placeholder page
+            if (!images.length) {
+                const emptyHtml = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{background:#e9edf2;margin:0;padding:20px;font-family:Arial,Helvetica,sans-serif} .page{width:${wmm}mm;height:${hmm}mm;margin:0 auto;background:#fff;box-shadow:0 4px 18px rgba(2,6,23,0.25);position:relative;} .content{box-sizing:border-box;padding:${margin}mm;display:flex;align-items:center;justify-content:center;height:100%;color:#888}</style></head><body><div class="page"><div class="content">Tidak ada gambar untuk pratinjau</div></div></body></html>`;
+                return emptyHtml;
+            }
+
+            // compute content area in mm then convert to pixels using DPI
+            const contentWmm = Math.max(1, wmm - (margin * 2));
+            const contentHmm = Math.max(1, hmm - (margin * 2));
+            const targetPxW = Math.max(1, Math.round((contentWmm * dpi) / 25.4));
+            const targetPxH = Math.max(1, Math.round((contentHmm * dpi) / 25.4));
+
+            // choose image output format and quality for resized images
+            const outFormat = 'image/jpeg';
+            const q = (qualitySlider ? (qualitySlider.value / 100) : 0.9);
+
+            // resize images to fit the printable area (preserve aspect by fitting within targetPxW/targetPxH)
+            const resizedImages = [];
+            for (let i = 0; i < images.length; i++) {
+                const it = images[i];
+                try {
+                    // Aggressive prefetch: try to fetch the image as a Blob and convert to data URL
+                    // This ensures the image will be embedded (no remote URL) and avoids html2canvas CORS/taint issues.
+                    let baseSrc = it.src;
+                    try {
+                        const fetchedBlob = await fetchSrcAsBlob(it.src);
+                        const embedded = await blobToDataURL(fetchedBlob);
+                        if (embedded && typeof embedded === 'string' && embedded.indexOf('data:') === 0) {
+                            baseSrc = embedded;
+                        }
+                    } catch (prefetchErr) {
+                        // ignore prefetch error and fallback to original src
+                        console.warn('prefetch embed failed for', it.src, prefetchErr);
+                    }
+
+                    const img = new Image();
+                    // load chosen source (embedded data: or original URL) to determine natural size
+                    const loadSrc = baseSrc;
+                    const meta = await new Promise((resolve) => {
+                        img.onload = () => resolve({ w: img.naturalWidth || img.width || 0, h: img.naturalHeight || img.height || 0 });
+                        img.onerror = () => resolve(null);
+                        img.src = loadSrc;
+                    });
+
+                    let finalDataUrl = baseSrc;
+                    if (meta) {
+                        // compute fit dimensions while preserving aspect
+                        const srcW = meta.w || targetPxW;
+                        const srcH = meta.h || targetPxH;
+                        const scale = Math.min(targetPxW / srcW, targetPxH / srcH, 1);
+                        const wpx = Math.max(1, Math.round(srcW * scale));
+                        const hpx = Math.max(1, Math.round(srcH * scale));
+                        try {
+                            const r = await resizeDataURL(baseSrc, wpx, hpx, outFormat, q);
+                            if (r && typeof r === 'string' && r.indexOf('data:') === 0) {
+                                finalDataUrl = r;
+                            } else {
+                                // if resize didn't return a data: URL, ensure we at least embed via fetch
+                                try {
+                                    const b = await fetchSrcAsBlob(baseSrc);
+                                    const dr = await blobToDataURL(b);
+                                    if (dr && dr.indexOf('data:') === 0) finalDataUrl = dr;
+                                } catch (ee) { /* ignore */ }
+                            }
+                        } catch (e) {
+                            // fallback to trying to embed source directly
+                            try {
+                                const b = await fetchSrcAsBlob(baseSrc);
+                                const dr = await blobToDataURL(b);
+                                if (dr && dr.indexOf('data:') === 0) finalDataUrl = dr;
+                            } catch (ee) { /* fallback to original src */ }
+                        }
+                    }
+                    resizedImages.push({ src: finalDataUrl, label: it.label });
+                } catch (e) {
+                    console.warn('resizing/embedding failed for', it && it.src, e);
+                    resizedImages.push({ src: it.src, label: it.label });
+                }
+            }
+
+            // Generate HTML with one .page per resized image
+            let pagesHtml = '';
+            for (let pi = 0; pi < resizedImages.length; pi++) {
+                const img = resizedImages[pi];
+                pagesHtml += `<div class="page" data-page="${pi+1}">`;
+                pagesHtml += `<div class="content">${img && img.src ? `<img src="${img.src}" alt="${(img.label||'image').replace(/"/g,'') }"/>` : '<div style="color:#888">Tidak ada gambar</div>'}</div>`;
+                pagesHtml += `<div class="meta">${(fmt.indexOf('word')!==-1 ? 'Word' : 'PDF')} • ${wmm}×${hmm} mm • Margin ${margin} mm • ${dpi} DPI • Halaman ${pi+1} / ${resizedImages.length}</div>`;
+                pagesHtml += `</div>`;
+            }
+
+            const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+                body{background:#e9edf2;margin:0;padding:20px;font-family:Arial,Helvetica,sans-serif}
+                .page{width:${wmm}mm;height:${hmm}mm;margin:0 auto;background:#fff;box-shadow:0 4px 18px rgba(2,6,23,0.25);position:relative;margin-bottom:18px}
+                .content{box-sizing:border-box;padding:${margin}mm;display:flex;align-items:center;justify-content:center;height:100%;}
+                .content img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+                .meta{position:absolute;left:8px;bottom:6px;color:#666;font-size:11px}
+            </style></head><body>${pagesHtml}</body></html>`;
+            return html;
+        } catch (e) { return '<html><body><div>Preview gagal dibuat</div></body></html>'; }
+    }
+
+    async function updateExportPreview(forceFormat) {
+        try {
+            const iframe = document.getElementById('export-preview-iframe');
+            const label = document.getElementById('export-format-label');
+            if (!iframe) return;
+            const fmt = forceFormat || (formatSelect && formatSelect.value) || 'application/pdf';
+            if (label) label.textContent = (fmt.indexOf('word')!==-1 ? 'Word' : 'PDF');
+            // buildExportHTML is async now and resizes images to DPI/margin
+            const html = await buildExportHTML(fmt);
+            // use srcdoc when available
+            try { iframe.srcdoc = html; } catch (e) { iframe.src = 'data:text/html;charset=utf-8,' + encodeURIComponent(html); }
+            // Position the export preview according to the first image orientation
+            try {
+                // extract first image src from the generated HTML when possible
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const firstImg = doc.querySelector('.page img');
+                const firstSrc = firstImg ? firstImg.getAttribute('src') : null;
+                positionExportPreviewForFirstImage(firstSrc);
+            } catch (e) {}
+        } catch (e) { console.error('updateExportPreview error', e); }
+    }
+
+    function positionExportPreviewForFirstImage(imgSrc) {
+        try {
+            const exportSection = document.getElementById('export-preview-section');
+            if (!exportSection) return;
+            const canvasArea = document.querySelector('.canvas-area');
+            const editorRoot = document.querySelector('.editor');
+            if (!canvasArea || !editorRoot) return;
+
+            function moveToCanvasSide() {
+                // keep exportSection outside of .canvas-area: insert it into the
+                // editor grid just before the right sidebar so it visually sits
+                // to the right of the canvas area while remaining a sibling.
+                exportSection.classList.remove('full-row');
+                exportSection.classList.add('export-side-by-side');
+                const rightSidebar = document.querySelector('.sidebar.right');
+                if (rightSidebar && rightSidebar.parentNode === editorRoot) {
+                    if (rightSidebar.previousSibling !== exportSection) editorRoot.insertBefore(exportSection, rightSidebar);
+                } else {
+                    // fallback: insert after canvasArea
+                    try { editorRoot.insertBefore(exportSection, canvasArea.nextSibling); } catch (e) { /* ignore */ }
+                }
+            }
+
+            function moveToFullRow() {
+                // restore full-row layout and remove side-by-side class
+                exportSection.classList.add('full-row');
+                exportSection.classList.remove('export-side-by-side');
+                // ensure exportSection is directly under .editor after canvas-area
+                const after = canvasArea.nextSibling;
+                if (after !== exportSection) {
+                    try { editorRoot.insertBefore(exportSection, canvasArea.nextSibling); } catch (e) { /* ignore */ }
+                }
+            }
+
+            if (!imgSrc) {
+                // no image info — default to full row
+                moveToFullRow();
+                return;
+            }
+
+            const img = new Image();
+            img.onload = function () {
+                const w = img.naturalWidth || img.width || 0;
+                const h = img.naturalHeight || img.height || 0;
+                if (h > w) moveToCanvasSide(); else moveToFullRow();
+            };
+            img.onerror = function () { moveToFullRow(); };
+            img.src = imgSrc;
+        } catch (e) { console.error('positionExportPreviewForFirstImage error', e); }
+    }
+
+    // wire preview buttons and inputs
+    try {
+        const previewPdfBtn = document.getElementById('preview-pdf');
+        const previewWordBtn = document.getElementById('preview-word');
+        if (previewPdfBtn) previewPdfBtn.addEventListener('click', (e) => { e.preventDefault(); updateExportPreview('application/pdf'); });
+        if (previewWordBtn) previewWordBtn.addEventListener('click', (e) => { e.preventDefault(); updateExportPreview('application/msword'); });
+        if (formatSelect) formatSelect.addEventListener('change', () => updateExportPreview());
+        const paperEl = document.getElementById('paper-size'); if (paperEl) paperEl.addEventListener('change', () => updateExportPreview());
+        const orientEls = document.querySelectorAll('input[name="orientation"]'); orientEls.forEach(el => el.addEventListener('change', () => updateExportPreview()));
+        const dpiEl = document.getElementById('dpi'); if (dpiEl) dpiEl.addEventListener('input', () => updateExportPreview());
+        const marginEl = document.getElementById('margin'); if (marginEl) marginEl.addEventListener('input', () => updateExportPreview());
+        if (imagePreview) imagePreview.addEventListener('load', () => updateExportPreview());
+    } catch (e) {}
+
 
     function resizeDataURL(src, w, h, fmt, q) {
         return new Promise((resolve, reject) => {
@@ -742,6 +974,109 @@ document.addEventListener('DOMContentLoaded', () => {
             img.onerror = () => resolve(src);
             img.src = src;
         });
+    }
+
+    // load html2pdf bundle dynamically if not already loaded
+    function ensureHtml2PdfLoaded() {
+        return new Promise((resolve, reject) => {
+            if (typeof html2pdf !== 'undefined') return resolve();
+            const src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js';
+            const existing = document.querySelector(`script[src="${src}"]`);
+            if (existing) {
+                existing.addEventListener('load', () => resolve());
+                existing.addEventListener('error', () => reject(new Error('Failed to load html2pdf')));
+                return;
+            }
+            const s = document.createElement('script'); s.src = src; s.async = true;
+            s.onload = () => resolve();
+            s.onerror = () => reject(new Error('Failed to load html2pdf'));
+            document.head.appendChild(s);
+        });
+    }
+
+    async function downloadExportPreview() {
+        try {
+            const fmt = (formatSelect && formatSelect.value) ? formatSelect.value : 'application/pdf';
+            const paper = (document.getElementById('paper-size') || {}).value || 'a4';
+            const orientation = (document.querySelector('input[name="orientation"]:checked') || {}).value || 'portrait';
+            const dpi = parseInt((document.getElementById('dpi') || {}).value, 10) || 300;
+            const margin = parseInt((document.getElementById('margin') || {}).value, 10) || 10;
+
+            // buildExportHTML is async and will resize images according to DPI/margin
+            const html = await buildExportHTML(fmt);
+
+            if (fmt.indexOf('pdf') !== -1) {
+                // generate PDF with html2pdf
+                await ensureHtml2PdfLoaded();
+                // create a hidden container with the built HTML
+                const wrap = document.createElement('div');
+                wrap.style.position = 'fixed'; wrap.style.left = '-9999px'; wrap.style.top = '0';
+                wrap.style.width = '1000px';
+                wrap.innerHTML = html;
+                document.body.appendChild(wrap);
+
+                // compute page size in mm for jsPDF format
+                const dims = paperSizeToMM(paper);
+                let wmm = dims.w, hmm = dims.h;
+                if (orientation === 'landscape') { const t = wmm; wmm = hmm; hmm = t; }
+
+                const filename = `export.${fmt.indexOf('word') !== -1 ? 'doc' : 'pdf'}`;
+                const opt = {
+                    margin: margin,
+                    filename: filename,
+                    image: { type: 'jpeg', quality: (qualitySlider ? (qualitySlider.value / 100) : 0.9) },
+                    html2canvas: { scale: Math.min(2, window.devicePixelRatio || 1), useCORS: true, allowTaint: true },
+                    jsPDF: { unit: 'mm', format: [wmm, hmm], orientation: orientation }
+                };
+
+                // wait for images inside wrap to load before generating PDF (longer timeout)
+                showNotification('Mempersiapkan ekspor PDF — menunggu gambar termuat...', 'success');
+                await new Promise((res) => {
+                    const imgs = Array.from(wrap.querySelectorAll('img'));
+                    if (!imgs.length) return res();
+                    let remaining = imgs.length;
+                    function checkDone() { if (--remaining <= 0) res(); }
+                    imgs.forEach((im) => {
+                        if (im.complete && im.naturalWidth) return checkDone();
+                        im.addEventListener('load', checkDone);
+                        im.addEventListener('error', checkDone);
+                    });
+                    // extended safety timeout in case some images neither load nor error
+                    setTimeout(() => { try { console.warn('image wait timeout reached'); res(); } catch (e) { res(); } }, 10000);
+                });
+
+                // html2pdf will create and save the PDF
+                await new Promise((resolve, reject) => {
+                    try {
+                        html2pdf().set(opt).from(wrap).save().then(() => { resolve(); }).catch((e) => { reject(e); });
+                    } catch (e) { reject(e); }
+                });
+
+                // cleanup
+                try { wrap.remove(); } catch (e) {}
+                return;
+            }
+
+            if (fmt.indexOf('word') !== -1 || fmt.indexOf('msword') !== -1) {
+                // for Word, create a .doc file with HTML content (widely supported)
+                const blob = new Blob([html], { type: 'application/msword' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = `export.doc`;
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} }, 5000);
+                return;
+            }
+
+            // fallback: save HTML
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'export.html';
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} }, 5000);
+        } catch (e) {
+            console.error('downloadExportPreview failed', e);
+            showNotification('Gagal membuat unduhan pratinjau ekspor', 'error');
+        }
     }
 
     function estimateDataURLSize(dataUrl) {
@@ -1092,6 +1427,11 @@ document.addEventListener('DOMContentLoaded', () => {
             try { addToRecentImages(item.src, item.name); } catch (e) {}
             return;
         }
+        // ensure the right sidebar is visible when adding thumbnails
+        try {
+            const rightAside = document.querySelector('.sidebar.right');
+            if (rightAside) rightAside.style.display = '';
+        } catch (e) {}
         const it = Object.assign({ src: '', name: 'image', width: null, height: null, size: null, type: null, originalSrc: null, originalWidth: null, originalHeight: null, originalSize: null, applied: false }, item || {});
         if (!it.originalSrc) it.originalSrc = it.src;
         if (!it.originalWidth && it.width) it.originalWidth = it.width;
@@ -1100,24 +1440,52 @@ document.addEventListener('DOMContentLoaded', () => {
         sideThumbsData.push(it);
         sideThumbsPage = 0;
         renderSideThumbs(sideThumbsPage);
+        try { updateExportPreview(); } catch (e) {}
     }
 
     function renderSideThumbs(page) {
         const side = document.getElementById('side-thumbs');
         if (!side) return;
         side.innerHTML = '';
-        const controls = document.createElement('div');
-        controls.className = 'side-thumbs-controls';
-        const totalPages = Math.max(1, Math.ceil(sideThumbsData.length / SIDE_THUMBS_PAGE_SIZE));
-        const prev = document.createElement('button'); prev.className = 'thumb-nav'; prev.textContent = '◀';
-        const next = document.createElement('button'); next.className = 'thumb-nav'; next.textContent = '▶';
-        const info = document.createElement('div'); info.className = 'thumb-info'; info.textContent = `${(page||0)+1} / ${totalPages}`;
-        prev.disabled = (page <= 0);
-        next.disabled = (page >= totalPages - 1);
-        prev.addEventListener('click', () => { sideThumbsPage = Math.max(0, sideThumbsPage - 1); renderSideThumbs(sideThumbsPage); });
-        next.addEventListener('click', () => { sideThumbsPage = Math.min(totalPages - 1, sideThumbsPage + 1); renderSideThumbs(sideThumbsPage); });
-        controls.appendChild(prev); controls.appendChild(info); controls.appendChild(next);
-        side.appendChild(controls);
+        const isGrid3x2 = side.classList && side.classList.contains && side.classList.contains('grid-3x2');
+        const isHorizontal = side.classList && side.classList.contains && side.classList.contains('horizontal-scroll');
+        const pageSize = (function() {
+            try { const v = parseInt(side.dataset.maxThumbs, 10); return (isNaN(v) || v <= 0) ? (isGrid3x2 ? 6 : SIDE_THUMBS_PAGE_SIZE) : v; } catch (e) { return (isGrid3x2 ? 6 : SIDE_THUMBS_PAGE_SIZE); }
+        })();
+
+    const totalPages = Math.max(1, Math.ceil(sideThumbsData.length / pageSize));
+
+    // Determine if controls should be suppressed for this container (convert page may set data-no-controls)
+    const disableControls = side && side.dataset && side.dataset.noControls === 'true';
+
+    // If horizontal variant is used, render a horizontal scroller and provide left/right scroll controls
+    if (isHorizontal) {
+        if (!disableControls) {
+            const controls = document.createElement('div');
+            controls.className = 'side-thumbs-controls';
+            const left = document.createElement('button'); left.className = 'thumb-nav'; left.textContent = '◀';
+            const right = document.createElement('button'); right.className = 'thumb-nav'; right.textContent = '▶';
+            left.addEventListener('click', () => { try { side.scrollBy({ left: -Math.round(side.clientWidth * 0.7), behavior: 'smooth' }); } catch (e) { side.scrollLeft = Math.max(0, side.scrollLeft - Math.round(side.clientWidth * 0.7)); } });
+            right.addEventListener('click', () => { try { side.scrollBy({ left: Math.round(side.clientWidth * 0.7), behavior: 'smooth' }); } catch (e) { side.scrollLeft = Math.min(side.scrollWidth, side.scrollLeft + Math.round(side.clientWidth * 0.7)); } });
+            controls.appendChild(left); controls.appendChild(right);
+            side.appendChild(controls);
+        }
+    } else {
+        const noPaging = (isGrid3x2 && totalPages <= 1);
+        if (!noPaging && !disableControls) {
+            const controls = document.createElement('div');
+            controls.className = 'side-thumbs-controls';
+            const prev = document.createElement('button'); prev.className = 'thumb-nav'; prev.textContent = '◀';
+            const next = document.createElement('button'); next.className = 'thumb-nav'; next.textContent = '▶';
+            const info = document.createElement('div'); info.className = 'thumb-info'; info.textContent = `${(page||0)+1} / ${totalPages}`;
+            prev.disabled = (page <= 0);
+            next.disabled = (page >= totalPages - 1);
+            prev.addEventListener('click', () => { sideThumbsPage = Math.max(0, sideThumbsPage - 1); renderSideThumbs(sideThumbsPage); });
+            next.addEventListener('click', () => { sideThumbsPage = Math.min(totalPages - 1, sideThumbsPage + 1); renderSideThumbs(sideThumbsPage); });
+            controls.appendChild(prev); controls.appendChild(info); controls.appendChild(next);
+            side.appendChild(controls);
+        }
+    }
 
         if (sideThumbsData.length === 0) {
             const empty = document.createElement('div'); empty.className = 'thumb-empty'; empty.textContent = 'Tidak ada gambar tambahan';
@@ -1125,13 +1493,29 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const start = page * SIDE_THUMBS_PAGE_SIZE;
-        const slice = sideThumbsData.slice(start, start + SIDE_THUMBS_PAGE_SIZE);
-        slice.forEach((itemData, idx) => {
-            const globalIndex = start + idx;
+    // determine items to render; horizontal variant shows all items in a single scroll row
+    const currentPage = (typeof page === 'number' && page >= 0) ? page : (typeof sideThumbsPage === 'number' ? sideThumbsPage : 0);
+    // keep the module-level page state in sync
+    sideThumbsPage = currentPage;
+    const start = currentPage * pageSize;
+    const itemsToRender = isHorizontal ? sideThumbsData.slice(0) : sideThumbsData.slice(start, start + pageSize);
+        itemsToRender.forEach((itemData, idx) => {
+            const globalIndex = isHorizontal ? idx : (start + idx);
             const item = document.createElement('div'); item.className = 'thumb';
             const img = document.createElement('img'); img.src = itemData.src; img.alt = itemData.name || 'thumb';
             item.appendChild(img);
+
+            // delete button (top-right corner)
+            const delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.className = 'thumb-delete';
+            delBtn.setAttribute('aria-label', 'Hapus gambar');
+            delBtn.innerHTML = '<i class="fas fa-trash"></i>';
+            delBtn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                try { deleteSideThumb(globalIndex); } catch (e) { console.error('deleteSideThumb error', e); }
+            });
+            item.appendChild(delBtn);
 
             const meta = document.createElement('div'); meta.className = 'thumb-meta';
             const dimRow = document.createElement('div'); dimRow.className = 'meta-row';
@@ -1252,6 +1636,41 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+        function deleteSideThumb(index) {
+            try {
+                if (!Number.isInteger(index) || index < 0 || index >= sideThumbsData.length) return;
+                // If deleting the currently previewed sidebar index, clear preview selection
+                if (typeof currentPreviewSideIndex === 'number' && currentPreviewSideIndex === index) {
+                    currentPreviewSideIndex = null;
+                    // reset preview to initial state if available
+                    if (initialState && initialState.src && imagePreview) {
+                        imagePreview.src = initialState.src; originalWidth = initialState.width || originalWidth; originalHeight = initialState.height || originalHeight;
+                        if (newDimensions) newDimensions.textContent = `${initialState.width || '-'} × ${initialState.height || '-'}`;
+                    }
+                }
+                // Remove the item
+                sideThumbsData.splice(index, 1);
+                // If no thumbnails remain, hide the right sidebar to keep UI clean
+                if (!sideThumbsData.length) {
+                    try {
+                        const rightAside = document.querySelector('.sidebar.right');
+                        if (rightAside) rightAside.style.display = 'none';
+                    } catch (e) {}
+                }
+                // Adjust currentPreviewSideIndex if it was after the deleted index
+                if (typeof currentPreviewSideIndex === 'number' && currentPreviewSideIndex > index) currentPreviewSideIndex -= 1;
+                // Recompute page if needed
+                const side = document.getElementById('side-thumbs');
+                const isGrid3x2 = side && side.classList && side.classList.contains && side.classList.contains('grid-3x2');
+                const pageSize = (function() { try { const v = parseInt(side && side.dataset && side.dataset.maxThumbs, 10); return (isNaN(v) || v <= 0) ? (isGrid3x2 ? 6 : SIDE_THUMBS_PAGE_SIZE) : v; } catch (e) { return (isGrid3x2 ? 6 : SIDE_THUMBS_PAGE_SIZE); } })();
+                const totalPages = Math.max(1, Math.ceil(sideThumbsData.length / pageSize));
+                if (sideThumbsPage >= totalPages) sideThumbsPage = Math.max(0, totalPages - 1);
+                renderSideThumbs(sideThumbsPage);
+                showNotification('Gambar dihapus');
+                try { updateExportPreview(); } catch (e) {}
+            } catch (e) { console.error('deleteSideThumb error', e); showNotification('Gagal menghapus gambar', 'error'); }
+        }
+
     function setSideThumbsPosition(pos) {
         const side = document.getElementById('side-thumbs');
         const leftTarget = document.getElementById('side-thumbs-target');
@@ -1349,6 +1768,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     })();
 
+    // Ukuran Gambar handling removed per user request
+
     (function wireGenericCollapsibles(){
         const toggles = document.querySelectorAll('.collapsible-toggle');
         if (!toggles || !toggles.length) return;
@@ -1428,7 +1849,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
     if (applyBtn) applyBtn.addEventListener('click', showApplyModal);
-    if (downloadBtn) downloadBtn.addEventListener('click', showDownloadModal);
+        // handle download click for both legacy `#download-btn` and new `#download-export-btn`
+        async function handleDownloadClick(e) {
+            try {
+                if (e && e.preventDefault) e.preventDefault();
+                const exportIframe = document.getElementById('export-preview-iframe');
+                if (exportIframe) {
+                    try { await downloadExportPreview(); return; } catch (err) { console.error('downloadExportPreview error', err); }
+                }
+                showDownloadModal();
+            } catch (err) { console.error('handleDownloadClick error', err); showDownloadModal(); }
+        }
+
+        if (downloadBtn) downloadBtn.addEventListener('click', handleDownloadClick);
+        if (downloadExportBtn) downloadExportBtn.addEventListener('click', handleDownloadClick);
         if (resetBtn) {
             try { resetBtn.type = resetBtn.type || 'button'; } catch (e) {}
             if (!resetBtn._wired) {
